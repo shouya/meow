@@ -93,10 +93,10 @@
   (type< (type-of val ns) type))
 
 
-(define (union-type< type types)
+(define (union-type< type types ns tvns)
   (define uts types)
   (define (any<uts t)
-    (ormap (λ (x) (type< t x)) uts))
+    (ormap (λ (x) (type< t x ns tvns)) uts))
   (match type
     [(cons (or 'T 'TV 'F 'TF) _)
      (any<uts type)]
@@ -114,6 +114,25 @@
          (cons (list k v) (clojure-assoc xs key val)))]))
 
 
+(define (typevar-type< type varname ns tvns)
+; (let ([new-tvns (clojure-assoc tvns varname t1)])
+  (if (unbound-typevar? varname tvns)
+      #t
+      (type< type (typevar-deref varname tvns) ns tvns)))
+
+
+(define (global-type< type typename ns tvns)
+  (cond
+   [(eq? (car type) 'TV)
+    (if (unbound-typevar? (cdr type) tvns)
+        #f
+        (let ([force-t1 (typevar-deref (cdr type) tvns)]
+              [t2       (make-global-type typename)])
+          (type< force-t1 t2 ns tvns)))]
+   [(eq? (car type) 'T) (equal? t (cdr type))]
+   [#t                  #f]))
+
+
 (define (force-type type tvns)
   (if (eq? (car type) 'TV)
       (typevar-deref (cdr type) tvns)
@@ -124,19 +143,9 @@
 ; U T TV F TF
 (define (type< t1 t2 [ns '()] [tvns '()])
   (match t2
-    [(cons 'U ts) (union-type< t1 ts)]
-    [(cons 'TV varname)
-     (let ([new-tvns (clojure-assoc tvns varname t1)])
-       (if (unbound-typevar? varname tvns)
-           #t
-           (type< t1 (typevar-deref varname tvns) ns tvns)))]
-    [(cons 'T t) (cond
-                  [(eq? (car type) 'TV)
-                   (if (unbound-typevar? (cdr type))
-                       #f
-                       (type< t1 (typevar-deref (cdr type) tvns)))]
-                  [(eq? (car type) 'T) (equal? t (cdr type))]
-                  [#t                  #f])]
+    [(cons 'U ts) (union-type< t1 ts ns tvns)]
+    [(cons 'TV varname) (typevar-type< t1 varname ns tvns)]
+    [(cons 'T t) (global-type< t1 t ns tvns)]
     ;; TODO: F, TF
     ))
 
