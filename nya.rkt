@@ -3,8 +3,8 @@
 (require racket/match)
 (require racket/string)
 
-'((deftype (T/Nil  :: a))
-  (deftype (T/Cons :: a -> (T/U Nil (Cons a)) -> (Cons a)))
+'((deftype (Nil  :: a))
+  (deftype (Cons :: a -> (T/U Nil (Cons a)) -> (Cons a)))
 
   (typealias (List a)
              (T/U Nil (Cons a)))
@@ -92,8 +92,60 @@
 (define (is-of-type? val type [ns '()])
   (type< (type-of val ns) type))
 
-(define (type< t1 t2)
-  undefined)  ; TODO: undefined
+
+(define (union-type< type types)
+  (define uts types)
+  (define (any<uts t)
+    (ormap (λ (x) (type< t x)) uts))
+  (match type
+    [(cons (or 'T 'TV 'F 'TF) _)
+     (any<uts type)]
+    [(cons 'U uts-subset)
+     (andmap (λ (t) (any<uts t)) uts-subset)]))
+
+
+;; clojure-mixed assoc func, like assoc but replace/add values
+(define (clojure-assoc pairs key val)
+  (match pairs
+    ['() (list (list key val))]
+    [(cons (list k v) xs)
+     (if (equal? k key)
+         (cons (list key val) xs)
+         (cons (list k v) (clojure-assoc xs key val)))]))
+
+
+(define (force-type type tvns)
+  (if (eq? (car type) 'TV)
+      (typevar-deref (cdr type) tvns)
+      type))
+
+;; name space:
+
+; U T TV F TF
+(define (type< t1 t2 [ns '()] [tvns '()])
+  (match t2
+    [(cons 'U ts) (union-type< t1 ts)]
+    [(cons 'TV varname)
+     (let ([new-tvns (clojure-assoc tvns varname t1)])
+       (if (unbound-typevar? varname tvns)
+           #t
+           (type< t1 (typevar-deref varname tvns) ns tvns)))]
+    [(cons 'T t) (cond
+                  [(eq? (car type) 'TV)
+                   (if (unbound-typevar? (cdr type))
+                       #f
+                       (type< t1 (typevar-deref (cdr type) tvns)))]
+                  [(eq? (car type) 'T) (equal? t (cdr type))]
+                  [#t                  #f])]
+    ;; TODO: F, TF
+    ))
+
+
+
+
+
+
+
 
 (define (get-func-type func-name ns)
   undefined) ; TODO: undefined
