@@ -59,6 +59,39 @@
   (cons 'TF (cons tf ts)))
 
 
+(define (type-of expr [ns '()])
+  (match expr
+    [(list f   args ...) (type-of-func-appl f args ns)]
+    [(? integer? i)      (make-global-type 'Int)]
+    [(? string?  s)      (make-global-type 'Str)]
+    [(? boolean? b)      (make-global-type 'Bool)]
+;    [(list 'fn args ...) (type-of )]
+    ))
 
+(define (tc-fail-unmatched given expected)
+  (error 'type-check
+         "type unmatched, \n\tgiven:\t~a\n\texpected:\t~a"
+         (type->string given)
+         (type->string expected)))
+
+; (define (tc-fail-
+
+(define (type-of-func-appl func args ns)
+  (match (get-func-type func ns)
+    [('() (error 'type-of-func-appl "function '~a' not found" func))]
+    [(cons 'FT (cons at rett)) ;; a -> b
+     (match args
+       [(cons a rst) (if (is-of-type? a at ns)
+                         'you-re-cool-and-preceed-the-rest   ; TODO: undefined
+                         (fc-fail-unmatched (type-of a) at))]
+       [('())        rett])]
+    ))
+
+
+(define (is-of-type? val type [ns '()])
+  (type< (type-of val ns) type))
+
+(define (type< t1 t2)
+  undefined)
 
 (compile-type '(A -> (B a)))
