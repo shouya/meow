@@ -2,74 +2,58 @@
 
 (require racket/match)
 (require racket/string)
+(require racket/set)
 
-'((deftype (Nil  :: a))
-  (deftype (Cons :: a -> (T/U Nil (Cons a)) -> (Cons a)))
+'((deftype List)
 
-  (typealias (List a)
-             (T/U Nil (Cons a)))
-
-  (annotate (empty? :: (List a) -> Bool))
-  (annotate (cdr    :: (List a) -> (List a)))        ;; how to impl depedent type here?
+  (annotate (Nil    :: List))
+  (annotate (Cons   :: (T/U Int Str Bool) -> List -> List)
+  (annotate (empty? :: List -> Bool))
+  (annotate (cdr    :: List -> List))
   (annotate (+      :: Int -> Int -> Int))
-  (annotate (if     :: Bool -> a -> a -> a))
+  ;; without polymorphic types, one can only impl
+  ;; function like `if` in the compiler
+  ;  (annotate (if     :: Bool -> a -> a -> a))
 
-  (defn (length :: (List a) -> Int)
+  (defn (length :: List -> Int)
     [xs]
     (if (empty? xs)
-            0
-            (+ 1 (length (cdr xs)))))
+        0
+        (+ 1 (length (cdr xs)))))
+  )
   )
 
 
-
-(define (make-value type)
-  (list 'val (compile-type type)))
-
-
-(define (function-type? type)
-  (eq? (car type) 'F))
-
-(define (union-type? type)
-  (eq? (car type) 'U))
-
-(define (regular-type? type)
-  (not (or (union-type? type)
-           (function-type? type))))
-
 (define (compile-type type)
   (match type
-    [(list 'T/U ts ...)    (make-type-union ts)]
-    [(list a)              (compile-type a)]
-    [(list f '-> r ...)    (make-func-type
-                            (compile-type f)
-                            (compile-type r))]
-    [(list tf ts ...)      (make-typefunc-type
-                            tf (map compile-type ts))]
-    [(? global-type-name?) (make-global-type type)]
-    [(? type-var-name?)    (make-type-var type)]
+    [(list 'T/U ts ...)     (make-type-union (map compile-type ts))]
+    ;; right assoc prop of func type:
+    ;;   A -> B -> C === A -> (B -> C)
+    [(list f '-> r ...)     (make-func-type
+                             (compile-type f)
+                             (compile-type r))]
+    [(? regular-type-name?) (make-regular-type type)]
     ))
 
 (define (make-type-union ts)
-  (cons 'U (compile-type ts)))
+  (define uniq (compose set->list list->set))
+  (define (ts-flatten types)
+    (match types
+      ['() '()]
+      [(cons (cons 'U ts) rts) (append (ts-flatten ts)
+                                       (ts-flatten rts))]
+      [(cons a rts)            (cons a (ts-flatten rts))]))
+  (cons 'U (uniq (ts-flatten ts))))
 
-(define (global-type-name? name)
-  (regexp-match #rx"^[A-Z]" (symbol->string name)))
+(define (regular-type-name? name)
+  (regexp-match #rx"^[A-Z][a-z_]*$" (symbol->string name)))
 
-(define (make-global-type type)
+(define (make-regular-type type)
   (cons 'T type))
 
-(define (type-var-name? name)
-  (regexp-match #rx"^[a-z]" (symbol->string name)))
+(define (make-func-type a r)
+  (cons 'F (cons a r)))
 
-(define (make-type-var type)
-  (cons 'TV type))
-
-(define (make-func-type f r)
-  (cons 'F (cons f r)))
-
-(define (make-typefunc-type tf ts)
-  (cons 'TF (cons tf ts)))
 
 (define (type-of expr [ns '()])
   (match expr
@@ -86,7 +70,8 @@
                                             (type-compatible? r1 r2))]
     [((cons 'U ts) _) (ormap (λ (t) (type-compatible? t t2)) ts)]
     [(_ (cons 'U ts)) (ormap (λ (t) (type-compatible? t1 t)) ts)]
-    [
+    [((cons 'T a) (cons 'T b)) (equal? a b)]
+    ))
 
 
 (define (tc-fail-unmatched given expected)
