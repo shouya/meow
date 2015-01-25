@@ -26,6 +26,17 @@
 (define (make-value type)
   (list 'val (compile-type type)))
 
+
+(define (function-type? type)
+  (eq? (car type) 'F))
+
+(define (union-type? type)
+  (eq? (car type) 'U))
+
+(define (regular-type? type)
+  (not (or (union-type? type)
+           (function-type? type))))
+
 (define (compile-type type)
   (match type
     [(list 'T/U ts ...)    (make-type-union ts)]
@@ -62,12 +73,21 @@
 
 (define (type-of expr [ns '()])
   (match expr
-    [(list f   args ...) (type-of-func-appl f args ns)]
-    [(? integer? i)      (make-global-type 'Int)]
-    [(? string?  s)      (make-global-type 'Str)]
-    [(? boolean? b)      (make-global-type 'Bool)]
+    [(list f args ...) (type-of-func-appl f args ns)]
+    [(? integer? i)    (make-global-type 'Int)]
+    [(? string?  s)    (make-global-type 'Str)]
+    [(? boolean? b)    (make-global-type 'Bool)]
 ;    [(list 'fn args ...) (type-of )]
     ))
+
+(define (type-compatible? t1 t2)
+  (match* (t1 t2)
+    [((cons 'F a1 r1) (cons 'F a2 r2)) (and (type-compatible? a2 a1)
+                                            (type-compatible? r1 r2))]
+    [((cons 'U ts) _) (ormap (λ (t) (type-compatible? t t2)) ts)]
+    [(_ (cons 'U ts)) (ormap (λ (t) (type-compatible? t1 t)) ts)]
+    [
+
 
 (define (tc-fail-unmatched given expected)
   (error 'type-check
@@ -146,6 +166,7 @@
     [(cons 'U ts) (union-type< t1 ts ns tvns)]
     [(cons 'TV varname) (typevar-type< t1 varname ns tvns)]
     [(cons 'T t) (global-type< t1 t ns tvns)]
+    [(cons 'F arg rst) (func-type< t1 t2
     ;; TODO: F, TF
     ))
 
