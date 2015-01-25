@@ -84,8 +84,26 @@
     [(cons p ps) (make-func-type (infer-type-of p body)
                                  (type-of-fn ps body))]))
 
+
+(define (type-of-fn-appl fn args)
+  (define fn-type (type-of fn))
+  (define (fn-beta-reducible? dom arg)
+    (and (type-compatible? (type-of arg) dom)
+         (type< (type-of arg) dom)))
+
+  (define (recur fn-type args)
+    (cond
+     [(null? args) fn-type]
+     [(not (function-type? fn-type)) (error "applying a value to a non-function")]
+     [(not (fn-beta-reducible? (func-type-domain fn-type) (car arg)))
+      (error "applying an incompatible value to a function")]
+     [else
+      (recur (func-type-range fn-type) (cdr args))]))
+
+  (recur fn-type args))
+
+
 (define (assert-type t1 t2)
-  (type< t1 t2)) ;; TODO: define type<
   (if (type< t1 t2) #t
       (error "type mismatch, expect ~a, given ~a."))) ;; TODO: define type<
 
@@ -93,6 +111,9 @@
   (undefined))
 
 (define (type< type1 type2)
+  (undefined))
+
+(define (type-compatible? type1 type2)
   (undefined))
 
 
@@ -210,7 +231,6 @@
 (define (get-func-type func-name ns)
   undefined) ; TODO: undefined
 
-(define undefined '())
 |#
 
 ; U T F
