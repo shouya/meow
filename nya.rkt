@@ -29,9 +29,10 @@
     [(list 'T/U ts ...)     (make-type-union (map compile-type ts))]
     ;; right assoc prop of func type:
     ;;   A -> B -> C === A -> (B -> C)
-    [(list f '-> r ...)     (make-func-type
-                             (compile-type f)
-                             (compile-type r))]
+    [(list dom '-> rng ...) (make-func-type
+                            (compile-type dom)
+                            (compile-type rng))]
+    [(list a) (compile-type a)]
     [(? regular-type-name?) (make-regular-type type)]
     ))
 
@@ -51,10 +52,11 @@
 (define (make-regular-type type)
   (cons 'T type))
 
-(define (make-func-type a r)
-  (cons 'F (cons a r)))
+(define (make-func-type dom rng)
+  (cons 'F (cons dom rng)))
 
 
+#|
 (define (type-of expr [ns '()])
   (match expr
     [(list f args ...) (type-of-func-appl f args ns)]
@@ -151,7 +153,7 @@
     [(cons 'U ts) (union-type< t1 ts ns tvns)]
     [(cons 'TV varname) (typevar-type< t1 varname ns tvns)]
     [(cons 'T t) (global-type< t1 t ns tvns)]
-    [(cons 'F arg rst) (func-type< t1 t2
+    [(cons 'F arg rst) (func-type< t1 t2)]
     ;; TODO: F, TF
     ))
 
@@ -166,13 +168,12 @@
   undefined) ; TODO: undefined
 
 (define undefined '())
+|#
 
-
-; U T TV F TF
+; U T F
 (define (type->string type)
   (match type
     [(cons 'T t)     (symbol->string t)]
-    [(cons 'TV v)    (symbol->string v)]
     [(cons 'U xs)    (string-join (map type->string xs) " + "
                                   #:before-first "("
                                   #:after-last ")")]
@@ -180,13 +181,7 @@
      (string-append (type->string a)
                     " -> "
                     (type->string r))]
-    [(cons 'TF (cons t ts))
-     (string-join (cons (symbol->string t)
-                        (map type->string ts))
-                  " "
-                  #:before-first "("
-                  #:after-last ")")]
     ))
 
-(compile-type '(A -> (B a)))
-(type->string (compile-type '(A -> (B a))))
+(compile-type '(A -> B))
+(type->string (compile-type '(A -> B)))
