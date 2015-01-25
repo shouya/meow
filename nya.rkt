@@ -59,6 +59,18 @@
 (define (make-func-type dom rng)
   (cons 'F (cons dom rng)))
 
+(define (func-type? type)
+  (eq? 'F (car type)))
+
+(define (func-type-domain type)
+  (when (not (func-type? type))
+    (error "try to acquire domain from a non-function"))
+  (cadr type))
+(define (func-type-range type)
+  (when (not (func-type? type))
+    (error "try to acquire range from a non-function"))
+  (cddr type))
+
 
 
 (define (type-of expr)
@@ -94,8 +106,8 @@
   (define (recur fn-type args)
     (cond
      [(null? args) fn-type]
-     [(not (function-type? fn-type)) (error "applying a value to a non-function")]
-     [(not (fn-beta-reducible? (func-type-domain fn-type) (car arg)))
+     [(not (func-type? fn-type)) (error "applying a value to a non-function")]
+     [(not (fn-beta-reducible? (func-type-domain fn-type) (car args)))
       (error "applying an incompatible value to a function")]
      [else
       (recur (func-type-range fn-type) (cdr args))]))
