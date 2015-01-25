@@ -26,7 +26,7 @@
 
 (define (compile-type type)
   (match type
-    [(list 'T/U ts ...)     (make-type-union (map compile-type ts))]
+    [(list 'T/U ts ...)     (make-union-type (map compile-type ts))]
     ;; right assoc prop of func type:
     ;;   A -> B -> C === A -> (B -> C)
     [(list dom '-> rng ...) (make-func-type
@@ -36,7 +36,7 @@
     [(? regular-type-name?) (make-regular-type type)]
     ))
 
-(define (make-type-union ts)
+(define (make-union-type ts)
   (define uniq (compose set->list list->set))
   (define (ts-flatten types)
     (match types
@@ -44,7 +44,11 @@
       [(cons (cons 'U ts) rts) (append (ts-flatten ts)
                                        (ts-flatten rts))]
       [(cons a rts)            (cons a (ts-flatten rts))]))
-  (cons 'U (uniq (ts-flatten ts))))
+  (define result (uniq (ts-flatten ts)))
+
+  (if (equal? (length result) 1)
+      (car result)
+      (cons 'U result)))
 
 (define (regular-type-name? name)
   (regexp-match #rx"^[A-Z][a-z_]*$" (symbol->string name)))
@@ -54,6 +58,26 @@
 
 (define (make-func-type dom rng)
   (cons 'F (cons dom rng)))
+
+
+
+(define (type-of expr)
+  (match expr
+    [(list 'if cnd thn els) (type-of-if cnd thn els)]
+    ))
+
+
+
+(define (type-of-if cnd thn els)
+  (assert-type (type-of cnd) (make-regular-type 'Bool))
+  (make-union-type (type-of thn)
+                   (type-of els))
+  )
+
+
+
+(define (assert-type t1 t2)
+  (type< t1 t2)) ;; TODO: define type<
 
 
 #|
