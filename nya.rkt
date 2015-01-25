@@ -64,6 +64,8 @@
 (define (type-of expr)
   (match expr
     [(list 'if cnd thn els) (type-of-if cnd thn els)]
+    [(list 'fn prms bdy)    (type-of-fn prms bdy)]
+    [(list fn args ...)     (type-of-fn-appl fn args)]
     ))
 
 
@@ -75,10 +77,27 @@
   )
 
 
+(define (type-of-fn params body)
+  (match params
+    ['()         (error "empty arg is not supported")]
+    [(list p)    (infer-type-of p body)]
+    [(cons p ps) (make-func-type (infer-type-of p body)
+                                 (type-of-fn ps body))]))
 
 (define (assert-type t1 t2)
   (type< t1 t2)) ;; TODO: define type<
+  (if (type< t1 t2) #t
+      (error "type mismatch, expect ~a, given ~a."))) ;; TODO: define type<
 
+(define (infer-type-of var body)
+  (undefined))
+
+(define (type< type1 type2)
+  (undefined))
+
+
+(define (undefined)
+  (error "undefined"))
 
 #|
 (define (type-of expr [ns '()])
