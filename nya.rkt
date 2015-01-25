@@ -122,16 +122,44 @@
 (define (infer-type-of var body)
   (undefined))
 
-(define (type< type1 type2)
-  (undefined))
+(define (func-type-compatible? d1 r1 d2 r2)
+  (and (type-compatible? d1 d2)
+       (type-compatible? r2 r1))) ;; reversed!
+
+(define (union-type-compatible? ts1 ts2) ;; i.e. ts1 is-subset-of ts2
+  (andmap (λ (t1) (ormap (λ (t2) (type-compatible? t1 t2)) ts2)) ts1))
+
 
 (define (type-compatible? type1 type2)
+  (match* (type1 type2)
+    [((cons 'T name1) (cons 'T name2)) (equal? name1 name2)]
+    [(_               (cons 'T name2)) #f]
+    [((cons 'U ts1)   (cons 'U ts2))   (union-type-compatible? ts1 ts2)]
+    [(a               (cons 'U types))
+     (ormap (λ (t) (type-compatible? a t)) types)]
+    [((cons 'F (cons d1 r1)) (cons 'F (cons d2 r2)))
+     (func-type-compatible? d1 r1 d2 r2)]
+    [(_               (cons 'F _)) #f]))
+
+
+(define (type< type1 type2)
   (undefined))
 
 
 (define (undefined)
   (error "undefined"))
 
+(define (type->string type)
+  (match type
+    [(cons 'T t)     (symbol->string t)]
+    [(cons 'U xs)    (string-join (map type->string xs) " + "
+                                  #:before-first "("
+                                  #:after-last ")")]
+    [(cons 'F (cons a r))
+     (string-append (type->string a)
+                    " -> "
+                    (type->string r))]
+    ))
 #|
 (define (type-of expr [ns '()])
   (match expr
@@ -234,29 +262,35 @@
     ))
 
 
-
-
-
-
-
-
 (define (get-func-type func-name ns)
   undefined) ; TODO: undefined
 
 |#
 
 ; U T F
-(define (type->string type)
-  (match type
-    [(cons 'T t)     (symbol->string t)]
-    [(cons 'U xs)    (string-join (map type->string xs) " + "
-                                  #:before-first "("
-                                  #:after-last ")")]
-    [(cons 'F (cons a r))
-     (string-append (type->string a)
-                    " -> "
-                    (type->string r))]
-    ))
 
-(compile-type '(A -> B))
-(type->string (compile-type '(A -> B)))
+
+;;; Test cases
+(require rackunit)
+
+(define t compile-type)
+(check-equal? (t '(A -> B)) '(F . ((T . A) . (T . B))))
+(check-equal? (t '((T/U A) -> B)) '(F . ((T . A) . (T . B))))
+(check-true
+ (or (equal? (type->string (t '((T/U A B) -> B)))
+             "(B + A) -> B")
+     (equal? (type->string (t '((T/U A B) -> B)))
+             "(A + B) -> B")))
+
+
+(check-true  (type-compatible? (t 'A) (t 'A)))
+(check-false (type-compatible? (t 'A) (t 'B)))
+(check-true  (type-compatible? (t 'A) (t '(T/U A B))))
+(check-false (type-compatible? (t 'A) (t '(T/U B C))))
+(check-false (type-compatible? (t '(T/U A B)) (t 'A)))
+(check-true  (type-compatible? (t '(T/U A))   (t 'A)))
+(check-true  (type-compatible? (t '(T/U A B)) (t '(T/U E A B C D))))
+(check-true  (type-compatible? (t '(A -> B))  (t '(A -> B))))
+(check-false (type-compatible? (t '(B -> A))  (t '(A -> B))))
+(check-false (type-compatible? (t '((T/U A B) -> B)) (t '(A -> B))))
+(check-true  (type-compatible? (t '(A -> B)) (t '((T/U A B) -> B))))
