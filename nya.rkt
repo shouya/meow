@@ -7,7 +7,7 @@
 '((deftype List)
 
   (annotate (Nil    :: List))
-  (annotate (Cons   :: (T/U Int Str Bool) -> List -> List)
+  (annotate (Cons   :: (T/U Int Str Bool) -> List -> List))
   (annotate (empty? :: List -> Bool))
   (annotate (cdr    :: List -> List))
   (annotate (+      :: Int -> Int -> Int))
@@ -15,12 +15,11 @@
   ;; function like `if` in the compiler
   ;  (annotate (if     :: Bool -> a -> a -> a))
 
-  (defn (length :: List -> Int)
-    [xs]
-    (if (empty? xs)
-        0
-        (+ 1 (length (cdr xs)))))
-  )
+  (defvar length
+    (fn [xs]
+      (if (empty? xs)
+          0
+          (+ 1 (length (cdr xs))))))
   )
 
 
@@ -73,11 +72,22 @@
 
 
 
-(define (type-of expr)
+(define (type-of expr type-bindings)
   (match expr
-    [(list 'if cnd thn els) (type-of-if cnd thn els)]
-    [(list 'fn prms bdy)    (type-of-fn prms bdy)]
-    [(list fn args ...)     (type-of-fn-appl fn args)]
+    ;; primitive types
+    [(? integer?)             (compile-type 'Int)]
+    [(? string?)              (compile-type 'Str)]
+    [(? boolean?)             (compile-type 'Bool)]
+
+    ;; code structures
+    [(list 'if cnd thn els)   (type-of-if cnd thn els)]
+    [(list 'fn prms bdy)      (type-of-fn prms bdy)]
+    [(list 'let var val expr) (type-of-let var val expr)]
+    [(list fn args ...)       (type-of-fn-appl fn args)]
+
+    ;; variables
+    [(? symbol? var)        (or (type-of-var var type-bindings)
+                                (error "variable not defined"))]
     ))
 
 
@@ -100,8 +110,7 @@
 (define (type-of-fn-appl fn args)
   (define fn-type (type-of fn))
   (define (fn-beta-reducible? dom arg)
-    (and (type-compatible? (type-of arg) dom)
-         (type< (type-of arg) dom)))
+    (and (type-compatible? (type-of arg) dom)))
 
   (define (recur fn-type args)
     (cond
@@ -116,11 +125,8 @@
 
 
 (define (assert-type t1 t2)
-  (if (type< t1 t2) #t
+  (if (type-compatible? t1 t2) #t
       (error "type mismatch, expect ~a, given ~a."))) ;; TODO: define type<
-
-(define (infer-type-of var body)
-  (undefined))
 
 (define (func-type-compatible? d1 r1 d2 r2)
   (and (type-compatible? d1 d2)
@@ -142,8 +148,24 @@
     [(_               (cons 'F _)) #f]))
 
 
-(define (type< type1 type2)
-  (undefined))
+(define (type-of-var var type-bindings)
+  (cond [(assoc var type-bindings) => cdr]
+        [else                         '()]))
+
+#|
+    [(list 'if cnd thn els) (type-of-if cnd thn els)]
+    [(list 'fn prms bdy)    (type-of-fn prms bdy)]
+    [(list fn args ...)     (type-of-fn-appl fn args)]
+|#
+
+(define (infer-type-of var body type-bindings)
+  (define (infer body)
+    (match body
+      [(list 'if cnd thn els) ]
+      [(list 'fn prms bdy)]
+      ))
+  (cond [(type-of-var bar type-bindings) => identity]
+        [else (infer body)]))
 
 
 (define (undefined)
@@ -160,24 +182,6 @@
                     " -> "
                     (type->string r))]
     ))
-#|
-(define (type-of expr [ns '()])
-  (match expr
-    [(list f args ...) (type-of-func-appl f args ns)]
-    [(? integer? i)    (make-global-type 'Int)]
-    [(? string?  s)    (make-global-type 'Str)]
-    [(? boolean? b)    (make-global-type 'Bool)]
-;    [(list 'fn args ...) (type-of )]
-    ))
-
-(define (type-compatible? t1 t2)
-  (match* (t1 t2)
-    [((cons 'F a1 r1) (cons 'F a2 r2)) (and (type-compatible? a2 a1)
-                                            (type-compatible? r1 r2))]
-    [((cons 'U ts) _) (ormap (λ (t) (type-compatible? t t2)) ts)]
-    [(_ (cons 'U ts)) (ormap (λ (t) (type-compatible? t1 t)) ts)]
-    [((cons 'T a) (cons 'T b)) (equal? a b)]
-    ))
 
 
 (define (tc-fail-unmatched given expected)
@@ -186,88 +190,9 @@
          (type->string given)
          (type->string expected)))
 
-; (define (tc-fail-
 
-(define (type-of-func-appl func args ns)
-  (match (get-func-type func ns)
-    ['() (error 'type-of-func-appl "function '~a' not found" func)]
-    [(cons 'FT (cons at rett)) ;; a -> b
-     (match args
-       [(cons a rst) (if (is-of-type? a at ns)
-                         'you-re-cool-and-preceed-the-rest   ; TODO: undefined
-                         (tc-fail-unmatched (type-of a) at))]
-       ['()          rett])]
-    )) ; TODO: another case, pure value vs. empty args
-
-
-(define (is-of-type? val type [ns '()])
-  (type< (type-of val ns) type))
-
-
-(define (union-type< type types ns tvns)
-  (define uts types)
-  (define (any<uts t)
-    (ormap (λ (x) (type< t x ns tvns)) uts))
-  (match type
-    [(cons (or 'T 'TV 'F 'TF) _)
-     (any<uts type)]
-    [(cons 'U uts-subset)
-     (andmap (λ (t) (any<uts t)) uts-subset)]))
-
-
-;; clojure-mixed assoc func, like assoc but replace/add values
-(define (clojure-assoc pairs key val)
-  (match pairs
-    ['() (list (list key val))]
-    [(cons (list k v) xs)
-     (if (equal? k key)
-         (cons (list key val) xs)
-         (cons (list k v) (clojure-assoc xs key val)))]))
-
-
-(define (typevar-type< type varname ns tvns)
-; (let ([new-tvns (clojure-assoc tvns varname t1)])
-  (if (unbound-typevar? varname tvns)
-      #t
-      (type< type (typevar-deref varname tvns) ns tvns)))
-
-
-(define (global-type< type typename ns tvns)
-  (cond
-   [(eq? (car type) 'TV)
-    (if (unbound-typevar? (cdr type) tvns)
-        #f
-        (let ([force-t1 (typevar-deref (cdr type) tvns)]
-              [t2       (make-global-type typename)])
-          (type< force-t1 t2 ns tvns)))]
-   [(eq? (car type) 'T) (equal? t (cdr type))]
-   [#t                  #f]))
-
-
-(define (force-type type tvns)
-  (if (eq? (car type) 'TV)
-      (typevar-deref (cdr type) tvns)
-      type))
-
-;; name space:
-
-; U T TV F TF
-(define (type< t1 t2 [ns '()] [tvns '()])
-  (match t2
-    [(cons 'U ts) (union-type< t1 ts ns tvns)]
-    [(cons 'TV varname) (typevar-type< t1 varname ns tvns)]
-    [(cons 'T t) (global-type< t1 t ns tvns)]
-    [(cons 'F arg rst) (func-type< t1 t2)]
-    ;; TODO: F, TF
-    ))
-
-
-(define (get-func-type func-name ns)
-  undefined) ; TODO: undefined
-
-|#
-
-; U T F
+; Types: U T F
+; Exprs: if let fn fn-appl
 
 
 ;;; Test cases
