@@ -121,13 +121,23 @@
                    (type-of els type-bindings))
   )
 
+(define (more-loose-type t1 t2)
+  (cond
+   [(type-compatible? t1 t2) t2]
+   [(type-compatible? t2 t1) t1]
+   [else                     (tc-fail-unmatched t1 t2)]))
 
 (define (type-of-fn params body type-bindings)
   (match params
-    ['()         (error "empty arg is not supported")]
-    [(list p)    (infer-type-of p body)]
-    [(cons p ps) (make-func-type (infer-type-of p body type-bindings)
-                                 (type-of-fn ps body type-bindings))]))
+    ['()         (type-of body type-bindings)]
+    [(cons p ps)
+     (let* ([dom       (infer-type-of p body type-bindings)]
+            [arg-type  (make-type-binding p dom)]
+            [new-bdns  (append-binding arg-type type-bindings)]
+            [expr-type (type-of-fn ps body new-bdns)])
+       (make-func-type dom expr-type))]
+    ))
+
 
 
 (define (type-of-fn-appl fn args type-bindings)
@@ -181,10 +191,11 @@
     [(list fn args ...)     (type-of-fn-appl fn args)]
 |#
 
+
 (define (infer-type-of var body type-bindings)
   (define (infer body)
     (match body
-      [(list 'if cnd thn els) ]
+      [(list 'if cnd thn els)
       [(list 'fn prms bdy)]
       ))
   (cond [(type-of-var bar type-bindings) => identity]
