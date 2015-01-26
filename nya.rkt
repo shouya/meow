@@ -58,6 +58,9 @@
 (define (make-func-type dom rng)
   (cons 'F (cons dom rng)))
 
+(define (regular-type? type)
+  (eq? 'T (car type)))
+
 (define (func-type? type)
   (eq? 'F (car type)))
 
@@ -80,35 +83,55 @@
     [(? boolean?)             (compile-type 'Bool)]
 
     ;; code structures
-    [(list 'if cnd thn els)   (type-of-if cnd thn els)]
-    [(list 'fn prms bdy)      (type-of-fn prms bdy)]
-    [(list 'let var val expr) (type-of-let var val expr)]
-    [(list fn args ...)       (type-of-fn-appl fn args)]
+    [(list 'if cnd thn els)   (type-of-if cnd thn els type-bindings)]
+    [(list 'fn prms bdy)      (type-of-fn prms bdy type-bindings)]
+    [(list 'let var val expr) (type-of-let var val expr type-bindings)]
+    [(list fn args ...)       (type-of-fn-appl fn args type-bindings)]
+
+    ;; type-annotated expressions
+    [(list ':: expr type)     (type-of-typed-expr expr
+                                                  (compile-type type)
+                                                  type-bindings)]
+
+    ;; bracketed expr
+    [(list '$ expr ...)       (type-of expr type-bindings)]
 
     ;; variables
-    [(? symbol? var)        (or (type-of-var var type-bindings)
-                                (error "variable not defined"))]
+    [(? symbol? var)          (or (type-of-var var type-bindings)
+                                  (error "variable not defined"))]
     ))
 
+(define (make-type-binding expr type)
+  (cons expr type))
+(define (append-binding binding bindings)
+  (cons binding bindings))
+
+(define (type-of-let var val expr type-bindings)
+  (let* ([val-type   (type-of val type-bindings)]
+         [val-bding  (make-type-binding var val-type)]
+         [new-bdings (append-binding val-bding type-bindings)])
+    (type-of expr new-bdings)))
+
+(define (type-of-typed-expr expr type bindings) type)
 
 
-(define (type-of-if cnd thn els)
+(define (type-of-if cnd thn els type-bindings)
   (assert-type (type-of cnd) (make-regular-type 'Bool))
-  (make-union-type (type-of thn)
-                   (type-of els))
+  (make-union-type (type-of thn type-bindings)
+                   (type-of els type-bindings))
   )
 
 
-(define (type-of-fn params body)
+(define (type-of-fn params body type-bindings)
   (match params
     ['()         (error "empty arg is not supported")]
     [(list p)    (infer-type-of p body)]
-    [(cons p ps) (make-func-type (infer-type-of p body)
-                                 (type-of-fn ps body))]))
+    [(cons p ps) (make-func-type (infer-type-of p body type-bindings)
+                                 (type-of-fn ps body type-bindings))]))
 
 
-(define (type-of-fn-appl fn args)
-  (define fn-type (type-of fn))
+(define (type-of-fn-appl fn args type-bindings)
+  (define fn-type (type-of fn type-bindings))
   (define (fn-beta-reducible? dom arg)
     (and (type-compatible? (type-of arg) dom)))
 
