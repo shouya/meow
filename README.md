@@ -15,10 +15,12 @@ does not aim to be anything executable. In the other word, I didn't
 even plan to write an evaluator for her.
 
 nya is a field for me to carry out my own idea about how a
-contract-based static type-checking system is like.
+contract-based static type-checking system should be.
 
 nya consists of a simple dynamic-typed language and a type system for
 the language.
+
+お楽しみに!
 
 ## features
 
@@ -45,4 +47,31 @@ Some other features:
 <sup>[1]</sup>: custom types are quite the same as regular types,
 except the latter ones are built-in.
 
-お楽しみに!
+
+## type check and type inference
+
+nya features type inference, and it works good on recursive functions
+and branching expressions. e.g.
+
+```racket
+(type-of '(define len
+            (fn [xs] (if (empty? xs)
+                       0
+                       (+ 1 (len (cdr xs)))))))
+; => '(Array -> Int)
+
+(type-of '(if #t 100 "str")) ; => '(T/U Int Str)
+```
+<sup>*</sup> above code is just for demonstration. the `type-of`
+  function is only used internally. However, I will expose an
+  interface for the users to acquire the type of an expression.
+
+
+nya could also check for type conflicts:
+```racket
+(check '(fn [x] (if x (+ x x) x)))
+; => error: Int is incompatible with Bool
+
+(check '(+ #f #t))
+; => error: Int expected, Bool given
+```
