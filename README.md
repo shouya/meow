@@ -27,7 +27,7 @@ the language.
 Kinds of types (will be) supported:
 
 * regular types (T): `Int, Str, Bool`
-* union types (U): `(T/U Int Str)`
+* union types (U): `(T/U Int Str)` *(I will add special syntax for this in the future)*
 * function types (F): `(Str -> Str)`
 
 Currently only above will be implemented, because I failed on the
@@ -38,14 +38,16 @@ trial implementing these features myself:
 * ~~type functions~~
 
 However, these two features will still be expected in the future
-versions, perhaps after I know more about contract-based type systems.
+versions, perhaps after I know more about contract-based type
+systems. (These are more likely to be implemented in System-F type
+system, I will implement that as my next project)
 
-Some other features:
+As one of my fav features, functions *always* curry. So the expression `(+ 1)` has the type `Int -> Int`, given that `(+ :: Int -> Int -> Int)`.
 
-* custom types (T)<sup>[1]</sup>: `(deftype Array)`
 
 <sup>[1]</sup>: custom types are quite the same as regular types,
 except the latter ones are built-in.
+
 
 ## limitations & todos
 
@@ -82,11 +84,23 @@ answer.
 * `(:: expr type)`: type annotated expressions, the type check of expression will be ignored and the result of the whole expression will be the given type
 * `($ exprs ...)`: just like bracket-ed expressions, in order to distinct from function calling.
 
-### type signature
+### type signatures
 
-* `A`: name started with uppercased letter is a regular type
+* `Int,Bool,Str`: built-in types (actually the same as regualr types)
+* `A`: a name started with uppercased letter is a regular type
 * `(T/U A B C)`: union of types `A`, `B`, and `C`.
 * `A -> B -> C`: function type, means that it takes values in type `A` and `B`, and return something in type `C`
 * `(A)`: the same as `A`
+* `A -> (B -> C)`: equivalent to `A -> B -> C`.
 
-## have fun!
+types can be nested, for example, you can have:
+
+```
+(T/U (A -> B)
+     (A -> (T/U B C)))
+```
+
+
+## more?
+
+Just read the code, I left some comments in the source code!
