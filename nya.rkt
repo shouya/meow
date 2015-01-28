@@ -88,22 +88,30 @@
     [(? boolean?)             (compile-type 'Bool)]
 
     ;; code structures
+    ;; branching expr
     [(list 'if cnd thn els)   (type-of-if cnd thn els type-bindings)]
-    [(list 'fn prms bdy)      (type-of-fn prms bdy type-bindings)]
-    [(list 'let var val expr) (type-of-let var val expr type-bindings)]
-    [(list fn args ...)       (type-of-fn-appl fn args type-bindings)]
 
-    ;; type-annotated expressions
+    ;; local binding expr
+    [(list 'let var val expr) (type-of-let var val expr type-bindings)]
+
+    ;; func expr
+                                        ; TODO: check type as in typed-expr
+    [(list 'fn ':: type prms bdy)
+                              (compile-type type)]
+
+    ;; type-annotated expr
     [(list ':: expr type)     (type-of-typed-expr expr
                                                   (compile-type type)
                                                   type-bindings)]
-
-    ;; bracketed expr
+    ;; bracket-ed expr
     [(list '$ expr ...)       (type-of expr type-bindings)]
 
     ;; variables
     [(? symbol? var)          (or (type-of-var var type-bindings)
                                   (error "variable not defined"))]
+
+    [(list fn args ...)       (type-of-fn-appl fn args type-bindings)]
+
     ))
 
 (define (make-type-binding expr type)
@@ -121,22 +129,22 @@
 
 
 (define (type-of-if cnd thn els type-bindings)
-  (assert-type (type-of cnd) (compile-type 'Bool))
-  (make-union-type (type-of thn type-bindings)
-                   (type-of els type-bindings))
+  (assert-type (type-of cnd type-bindings) (compile-type 'Bool))
+  (make-union-type (list (type-of thn type-bindings)
+                         (type-of els type-bindings)))
   )
 
 (define (more-loose-type t1 t2)
   (cond
    [(type-compatible? t1 t2) t2]
    [(type-compatible? t2 t1) t1]
-   [else                     (tc-fail-unmatched t1 t2)]))
+   [else                     (tc-fail-mismatch t1 t2)]))
 
 (define (type-of-fn params body type-bindings)
   (match params
     ['()         (type-of body type-bindings)]
     [(cons p ps)
-     (let* ([dom       (infer-type-of p body type-bindings)]
+     (let* ([dom       (undefined p body type-bindings)]
             [arg-type  (make-type-binding p dom)]
             [new-bdns  (append-binding arg-type type-bindings)]
             [expr-type (type-of-fn ps body new-bdns)])
@@ -148,7 +156,7 @@
 (define (type-of-fn-appl fn args type-bindings)
   (define fn-type (type-of fn type-bindings))
   (define (fn-beta-reducible? dom arg)
-    (and (type-compatible? (type-of arg) dom)))
+    (and (type-compatible? (type-of arg type-bindings) dom)))
 
   (define (recur fn-type args)
     (cond
@@ -161,10 +169,6 @@
 
   (recur fn-type args))
 
-
-(define (assert-type t1 t2)
-  (if (type-compatible? t1 t2) #t
-      (error "type mismatch, expect ~a, given ~a."))) ;; TODO: define type<
 
 (define (func-type-compatible? d1 r1 d2 r2)
   (and (type-compatible? d1 d2)
@@ -187,110 +191,14 @@
      (func-type-compatible? d1 r1 d2 r2)]
     [(_               (cons 'F _)) #f]))
 
+(define (type-equal? t1 t2)
+  (and (type-compatible? t1 t2)
+       (type-compatible? t2 t1)))
+
 
 (define (type-of-var var type-bindings)
   (cond [(assoc var type-bindings) => cdr]
          [else                        (make-unknown-type)]))
-
-#|
-    [(list 'if cnd thn els) (type-of-if cnd thn els)]
-    [(list 'fn prms bdy)    (type-of-fn prms bdy)]
-    [(list fn args ...)     (type-of-fn-appl fn args)]
-|#
-
-
-(define (infer expr [expr-type (make-unknown-type)] [type-bindings '()])
-  (define (infer-multi-bindings bdns . exprs)
-    (match exprs
-      ['()         bdns]
-      [(cons (cons expr type) es)
-       (infer-multi-bindings (infer expr type bdns) es)]))
-
-  (define (infer-multi . exprs)
-    (apply infer-multi-bindings (cons type-bindings exprs)))
-
-  (define (confirm-var-type var)
-    (let ([vartype (type-of-var var type-bindings)])
-      (if (type-compatible? vartype expected-type)
-          (append-binding (make-type-binding var expected-type)
-                          type-bindings)
-          (tc-fail-unmatched vartype expected-type))))
-
-  (define (infer-fn-appl type fn args)
-    (define fn-type (type-of fn type-bindings))
-    (define (fn-beta-reducible? dom arg)
-      (define ns (infer-type-of arg dom type-bindings))
-
-      (type-compatible? (type-of arg type-bindings) dom))
-
-    (define (recur fn-type args)
-      (cond
-       [(null? args)               (if (check-match ]
-       [(not (func-type? fn-type)) (error "applying a value to a non-function")]
-       [(not (fn-beta-reducible?   (func-type-domain fn-type) (car args)))
-        (error "applying an incompatible value to a function")]
-       [else
-        (recur (func-type-range fn-type) (cdr args))]))
-
-  (recur fn-type args))
-
-  (define (infer-func-appl func args)
-    (define func-type (type-of func-type))
-    (define (recur ftype args)
-      (
-
-
-    (if (unknown-type? func-type)
-        (error (format "type of function ~a is not known" func))
-        (recur func-type args))))
-
-
-  (match expr
-    [(? symbol? var)           (confirm-var-type var)]
-    [(list 'if cnd thn els)    (infer-multi
-                                (cons cnd (compile-type 'Bool))
-                                (cons thn (make-unknown-type))
-                                (cons els (make-unknown-type)))]
-    [(list fn args ...)        (infer-func fn args)]
-    [(list 'fn prms bdy)       (undefined)]
-    [(list 'let name val expr) (undefined)]
-
-
-
-(define (infer-type-of var expr
-                       [expected-type (make-unknown-type)]
-                       [type-bindings '()])
-  (define (equal-var? x)
-    (and (symbol? x)
-         (eq? x var)))
-
-  (define (confirm-var)
-    (let ([vartype (type-of-var var type-bindings)])
-      (if (type-compatible? vartype expected-type)
-          (append-binding (make-type-binding var expected-type)
-                          type-bindings)
-          (tc-fail-unmatched vartype expected-type))))
-
-  (define (infer-if-cond cnd)
-    (infer cnd (compile-type 'Bool) type-bindings))
-
-  (define (infer-multiple bdns . exprs)
-    (match exprs
-      ['()         bdns]
-      [(cons e es) (infer-multiple (infer expr bdns) es)]))
-
-  (define (infer expr [bdns type-bindings] [expect expected-type])
-
-    (match expr
-      [(? equal-var?)            (confirm-var)]
-      [(list 'if cnd thn els)    (undefiend)]
-      [(list fn args ...)        (undefined)]
-      [(list 'fn prms bdy)       (undefined)]
-      [(list 'let name val expr) (undefined)]
-      ))
-
-  (define new-binding (infer expr)))
-
 
 
 
@@ -311,23 +219,77 @@
     ))
 
 
-(define (tc-fail-unmatched given expected)
-  (error 'type-check
-         "type unmatched, \n\tgiven:\t~a\n\texpected:\t~a"
+(define (tc-fail-mismatch given expected)
+  (error 'type-check-failure
+         "type mismatch\n\tgiven:\t\t~a\n\texpected:\t~a"
          (type->string given)
          (type->string expected)))
+
+(define (assert-type t1 t2)
+  (if (type-compatible? t1 t2) #t
+      (tc-fail-mismatch t1 t2)))
 
 
 ; Types: U T F
 ; Exprs: if let fn fn-appl
 
 
-;;; Test cases
+
+
+;;; Test
 (require rackunit)
 
+
+;; for demo purpose
+(define (pre-defined-bindings)
+  (define-syntax define-bindings
+    (syntax-rules (::)
+      [(define-bindings) '()]
+      [(define-bindings [name :: type ...] rst ...)
+       (let* ([n   (quote name)]
+              [t   (compile-type (quote (type ...)))]
+              [bdn (make-type-binding n t)])
+         (append-binding bdn (define-bindings rst ...)))]))
+
+  (define-bindings
+    [+      :: Int -> Int -> Int]
+    [empty? :: Array -> Bool]
+    [cdr    :: Array -> Array]
+    [length :: Array -> Int]
+    ;; this func is not perfect without polymorphism support
+    [car    :: Array -> Int]
+    [ival   :: Int]
+    [sval   :: Str]
+    [bval   :: Bool]
+    ))
+
+(define-syntax check-type-match
+  (syntax-rules (::)
+    [(check-type-match expr :: type ...)
+     (check-true (type-equal? (type-of expr (pre-defined-bindings))
+                              (compile-type (quote (type ...)))))]))
+
+(define-syntax check-type-match-cases
+  (syntax-rules (::)
+    [(check-type-match-cases [case ...] ...)
+     (begin
+       (check-type-match case ...) ...)]))
+
+(define-syntax check-type-compatible-cases
+  (syntax-rules (<:)
+    [(check-type-compatible-cases [t1 <: t2] ...)
+     (begin
+       (check-true (type-compatible? (compile-type (quote t1))
+                                     (compile-type (quote t2))))
+       ...)]))
+
+
+
+
 (define t compile-type)
-(check-equal? (t '(A -> B)) '(F . ((T . A) . (T . B))))
+(check-equal? (t '(A -> B))       '(F . ((T . A) . (T . B))))
 (check-equal? (t '((T/U A) -> B)) '(F . ((T . A) . (T . B))))
+
 (check-true
  (or (equal? (type->string (t '((T/U A B) -> B)))
              "(B + A) -> B")
