@@ -74,12 +74,6 @@
     (error "try to acquire range from a non-function"))
   (cddr type))
 
-(define (make-unknown-type)
-  (cons '? '()))
-(define (unknown-type? type)
-  (eq? '? (car type)))
-
-
 
 (define (type-of expr type-bindings)
   (match expr
@@ -181,8 +175,6 @@
 
 (define (type-compatible? type1 type2)
   (match* (type1 type2)
-    [((cons '? t1) _)                  #t]
-                                        ;    [(_ (cons '? t1))                  #f]
     [((cons 'T name1) (cons 'T name2)) (equal? name1 name2)]
     [(_               (cons 'T name2)) #f]
     [((cons 'U ts1)   (cons 'U ts2))   (union-type-compatible? ts1 ts2)]
@@ -199,7 +191,7 @@
 
 (define (type-of-var var type-bindings)
   (cond [(assoc var type-bindings) => cdr]
-        [else                        (make-unknown-type)]))
+        [else                         '()]))
 
 
 
@@ -231,8 +223,8 @@
       (tc-fail-mismatch t1 t2)))
 
 
-                                        ; Types: U T F
-                                        ; Exprs: if let fn fn-appl
+;; Types: U T F
+;; Exprs: if let fn fn-appl
 
 
 
