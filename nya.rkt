@@ -92,7 +92,7 @@
     ;; func expr
                                         ; TODO: check type as in typed-expr
     [(list 'fn ':: type prms bdy)
-     (compile-type type)]
+     (type-of-fn (compile-type type) prms bdy type-bindings)]
 
     ;; type-annotated expr
     [(list ':: expr type)     (type-of-typed-expr expr
@@ -135,14 +135,20 @@
    [(type-compatible? t2 t1) t1]
    [else                     (tc-fail-mismatch t1 t2)]))
 
-(define (type-of-fn params body type-bindings)
+(define (type-of-fn type params body type-bindings)
+  (define (check-deduced-type)
+    (let ([deduced-type (type-of body type-bindings)])
+      (assert-type deduced-type type)
+      type))
+
   (match params
-    ['()         (type-of body type-bindings)]
+    ['()               (check-deduced-type)]
     [(cons p ps)
-     (let* ([dom       (undefined p body type-bindings)]
-            [arg-type  (make-type-binding p dom)]
-            [new-bdns  (append-binding arg-type type-bindings)]
-            [expr-type (type-of-fn ps body new-bdns)])
+     (let* ([dom       (func-type-domain type)]
+            [rng       (func-type-range type)]
+            [prm-type  (make-type-binding p dom)]
+            [new-bdns  (append-binding prm-type type-bindings)]
+            [expr-type (type-of-fn rng ps body new-bdns)])
        (make-func-type dom expr-type))]
     ))
 
@@ -155,7 +161,7 @@
 
   (define (recur fn-type args)
     (cond
-     [(null? args) fn-type]
+     [(null? args)               fn-type]
      [(not (func-type? fn-type)) (error "applying a value to a non-function")]
      [(not (fn-beta-reducible?   (func-type-domain fn-type) (car args)))
       (error "applying an incompatible value to a function")]
@@ -225,7 +231,6 @@
 
 ;; Types: U T F
 ;; Exprs: if let fn fn-appl
-
 
 
 ;;; Test
@@ -352,8 +357,8 @@
 
  ;; fn (inference not available so far)
  ['(fn :: (Int -> Int) [a] 1)  :: Int -> Int]
- ;; this case should fail after finished function type check
- ['(fn :: (Int -> Int) [a] #t) :: Int -> Int]
+ ;; this case (+ a) curries, so it has type Int -> Int.
+ ['(fn :: (Int -> Int -> Int) [a] (+ a)) :: Int -> Int -> Int]
 
  ;; typed-expr
  ['(:: 1 Str)  :: Str]
