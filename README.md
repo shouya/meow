@@ -47,31 +47,46 @@ Some other features:
 <sup>[1]</sup>: custom types are quite the same as regular types,
 except the latter ones are built-in.
 
+## limitations & todos
 
-## type check and type inference
+nya cannot handle type check on recursive function yet. While you can
+rewrite your recursive function with help of Y-combinator to support
+it.
 
-nya features type inference, and it works good on recursive functions
-and branching expressions. e.g.
-
-```racket
-(type-of '(define len
-            (fn [xs] (if (empty? xs)
-                       0
-                       (+ 1 (len (cdr xs)))))))
-; => '(Array -> Int)
-
-(type-of '(if #t 100 "str")) ; => '(T/U Int Str)
-```
-<sup>*</sup> above code is just for demonstration. the `type-of`
-  function is only used internally. However, I will expose an
-  interface for the users to acquire the type of an expression.
+Nonetheless, I will add support for that in the following versions.
 
 
-nya could also check for type conflicts:
-```racket
-(check '(fn [x] (if x (+ x x) x)))
-; => error: Int is incompatible with Bool
+## type detection & type check
+nya features type detection and type check. That means you can ask nya
+"what's the type of this expression" and she will give you a proper
+answer.
 
-(check '(+ #f #t))
-; => error: Int expected, Bool given
-```
+## nya's syntax
+
+### commands
+
+* `(annotate name :: type)`: annotate a name with a type signature
+* `(deftype typename)`: define typename (does actually nothing, only for legibility)
+* `(def name expr)`: define a variable with the value of given expression
+
+### expressions
+
+* `(if cond then else)`: just if, simply, cond part will be required to have type 'Bool'
+* `(let var val expr)`: bind the result of val to var, and expression expr under the new binding
+* `(fn :: type [params ...] body)`: define a function with type specified. the params and the body will be type checked.
+* `1,2,3,...`: integer values
+* `"xxxx",...`: strings
+* `#t,#f`: boolean values
+* `var`: any symbol is an identifier
+* `(func args ...)`: apply args to func
+* `(:: expr type)`: type annotated expressions, the type check of expression will be ignored and the result of the whole expression will be the given type
+* `($ exprs ...)`: just like bracket-ed expressions, in order to distinct from function calling.
+
+### type signature
+
+* `A`: name started with uppercased letter is a regular type
+* `(T/U A B C)`: union of types `A`, `B`, and `C`.
+* `A -> B -> C`: function type, means that it takes values in type `A` and `B`, and return something in type `C`
+* `(A)`: the same as `A`
+
+## have fun!
