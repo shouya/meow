@@ -4,25 +4,35 @@
 (require racket/string)
 (require racket/set)
 
-(define whooo
-  '((deftype List)
+(require (for-syntax syntax/parse))
 
-  (annotate (Nil    :: List))
-  (annotate (Cons   :: (T/U Int Str Bool) -> List -> List))
-  (annotate (empty? :: List -> Bool))
-  (annotate (cdr    :: List -> List))
-  (annotate (+      :: Int -> Int -> Int))
-  ;; without polymorphic types, one can only impl
-  ;; function like `if` in the compiler layer
-  ;  (annotate (if     :: Bool -> a -> a -> a))
+(define (my-program)
+  (compile-type-bindings
+   '((deftype List)
 
-  (def length
-    (fn [xs]
-      (if (empty? xs)
-          0
-          (+ 1 (length (cdr xs))))))
-  )
-  )
+     (annotate Nil    :: List)
+     (annotate Cons   :: (T/U Int Str Bool) -> List -> List)
+     (annotate empty? :: List -> Bool)
+     (annotate cdr    :: List -> List)
+     (annotate +      :: Int -> Int -> Int)
+     ;; without polymorphic types, one can only impl
+     ;; function like `if` in the compiler layer
+     ;  (annotate (if     :: Bool -> a -> a -> a))
+
+     (def length (fn :: (Int -> Int) [x] (+ x 1)))
+
+     )))
+
+(void '(def length
+        (fn :: (List -> Int) [xs]
+            (if (empty? xs)
+                0
+                (+ 1 (length (cdr xs)))))
+
+        ;; type check for recursive functions are not supported yet.
+        ;; I'd to work on this later.
+        ))
+
 
 (define (compile-type type)
   (match type
@@ -229,6 +239,35 @@
       (tc-fail-mismatch t1 t2)))
 
 
+(define (compile-type-bindings program)
+  (define (compile-type-bindings-reverse program)
+    (match program
+      ['()            '()]
+      ;; deftype just carry on
+      [(list (list 'deftype _) rst ...)
+       (compile-type-bindings-reverse rst)]
+      [(list (list 'annotate name ':: type ...) rst ...)
+       (let* ([ctype    (compile-type type)]
+              [bnd      (make-type-binding name ctype)]
+              [oth-bdns (compile-type-bindings-reverse rst)])
+         (append-binding bnd oth-bdns))]
+      [(list (list 'def name expr) rst ...)
+       (let* ([oth-bdns  (compile-type-bindings-reverse rst)]
+              [expr-type (type-of expr oth-bdns)]
+              [bdn       (make-type-binding name expr-type)])
+         (append-binding bdn oth-bdns))]
+      [(list expr rst ...)
+       (let* ([oth-bdns  (compile-type-bindings-reverse rst)]
+              [expr-type (type-of expr oth-bdns)])
+         oth-bdns)]
+      ))
+
+  (compile-type-bindings-reverse
+   (reverse program)))
+
+
+
+
 ;; Types: U T F
 ;; Exprs: if let fn fn-appl
 
@@ -250,11 +289,11 @@
 
   (define-bindings
     [+      :: Int -> Int -> Int]
-    [empty? :: Array -> Bool]
-    [cdr    :: Array -> Array]
-    [length :: Array -> Int]
+    [empty? :: List -> Bool]
+    [cdr    :: List -> List]
+    [length :: List -> Int]
     ;; this func is not perfect without polymorphism support
-    [car    :: Array -> Int]
+    [car    :: List -> Int]
     [ival   :: Int]
     [sval   :: Str]
     [bval   :: Bool]
@@ -313,8 +352,8 @@
                   (equal? type-str "(A + B) -> B"))))
 
 
-; a <=: b means a is compatible   with b
-; a </: b means a is incompatible with b
+;; a <=: b means a is compatible   with b
+;; a </: b means a is incompatible with b
 
 (check-type-compatible-cases
  [A                <=:  A]
@@ -359,6 +398,9 @@
  ['(fn :: (Int -> Int) [a] 1)  :: Int -> Int]
  ;; this case (+ a) curries, so it has type Int -> Int.
  ['(fn :: (Int -> Int -> Int) [a] (+ a)) :: Int -> Int -> Int]
+ ;; recursive function not supported yet
+ ;; TODO: support this!
+ ; ['(let f (fn :: (Int -> Int) [a] (f a))) :: Int -> Int]
 
  ;; typed-expr
  ['(:: 1 Str)  :: Str]
@@ -367,3 +409,6 @@
  ;; bracketed expr
  ['($ + 1 2) :: Int]
  )
+
+
+(void (map (lambda (a) (printf "~a : ~a\n" (car a) (type->string (cdr a)))) (my-program)))
