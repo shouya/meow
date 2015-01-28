@@ -12,10 +12,10 @@
   (annotate (cdr    :: List -> List))
   (annotate (+      :: Int -> Int -> Int))
   ;; without polymorphic types, one can only impl
-  ;; function like `if` in the compiler
+  ;; function like `if` in the compiler layer
   ;  (annotate (if     :: Bool -> a -> a -> a))
 
-  (defvar length
+  (def length
     (fn [xs]
       (if (empty? xs)
           0
@@ -73,6 +73,11 @@
     (error "try to acquire range from a non-function"))
   (cddr type))
 
+(define (make-unknown-type)
+  (cons '? '()))
+(define (unknown-type? type)
+  (eq? '? (car type)))
+
 
 
 (define (type-of expr type-bindings)
@@ -116,7 +121,7 @@
 
 
 (define (type-of-if cnd thn els type-bindings)
-  (assert-type (type-of cnd) (make-regular-type 'Bool))
+  (assert-type (type-of cnd) (compile-type 'Bool))
   (make-union-type (type-of thn type-bindings)
                    (type-of els type-bindings))
   )
@@ -149,7 +154,7 @@
     (cond
      [(null? args) fn-type]
      [(not (func-type? fn-type)) (error "applying a value to a non-function")]
-     [(not (fn-beta-reducible? (func-type-domain fn-type) (car args)))
+     [(not (fn-beta-reducible?   (func-type-domain fn-type) (car args)))
       (error "applying an incompatible value to a function")]
      [else
       (recur (func-type-range fn-type) (cdr args))]))
@@ -171,6 +176,8 @@
 
 (define (type-compatible? type1 type2)
   (match* (type1 type2)
+    [((cons '? t1) _)                  #t]
+;    [(_ (cons '? t1))                  #f]
     [((cons 'T name1) (cons 'T name2)) (equal? name1 name2)]
     [(_               (cons 'T name2)) #f]
     [((cons 'U ts1)   (cons 'U ts2))   (union-type-compatible? ts1 ts2)]
@@ -183,7 +190,7 @@
 
 (define (type-of-var var type-bindings)
   (cond [(assoc var type-bindings) => cdr]
-        [else                         '()]))
+         [else                        (make-unknown-type)]))
 
 #|
     [(list 'if cnd thn els) (type-of-if cnd thn els)]
@@ -192,14 +199,99 @@
 |#
 
 
-(define (infer-type-of var body type-bindings)
-  (define (infer body)
-    (match body
-      [(list 'if cnd thn els)
-      [(list 'fn prms bdy)]
+(define (infer expr [expr-type (make-unknown-type)] [type-bindings '()])
+  (define (infer-multi-bindings bdns . exprs)
+    (match exprs
+      ['()         bdns]
+      [(cons (cons expr type) es)
+       (infer-multi-bindings (infer expr type bdns) es)]))
+
+  (define (infer-multi . exprs)
+    (apply infer-multi-bindings (cons type-bindings exprs)))
+
+  (define (confirm-var-type var)
+    (let ([vartype (type-of-var var type-bindings)])
+      (if (type-compatible? vartype expected-type)
+          (append-binding (make-type-binding var expected-type)
+                          type-bindings)
+          (tc-fail-unmatched vartype expected-type))))
+
+  (define (infer-fn-appl type fn args)
+    (define fn-type (type-of fn type-bindings))
+    (define (fn-beta-reducible? dom arg)
+      (define ns (infer-type-of arg dom type-bindings))
+
+      (type-compatible? (type-of arg type-bindings) dom))
+
+    (define (recur fn-type args)
+      (cond
+       [(null? args)               (if (check-match ]
+       [(not (func-type? fn-type)) (error "applying a value to a non-function")]
+       [(not (fn-beta-reducible?   (func-type-domain fn-type) (car args)))
+        (error "applying an incompatible value to a function")]
+       [else
+        (recur (func-type-range fn-type) (cdr args))]))
+
+  (recur fn-type args))
+
+  (define (infer-func-appl func args)
+    (define func-type (type-of func-type))
+    (define (recur ftype args)
+      (
+
+
+    (if (unknown-type? func-type)
+        (error (format "type of function ~a is not known" func))
+        (recur func-type args))))
+
+
+  (match expr
+    [(? symbol? var)           (confirm-var-type var)]
+    [(list 'if cnd thn els)    (infer-multi
+                                (cons cnd (compile-type 'Bool))
+                                (cons thn (make-unknown-type))
+                                (cons els (make-unknown-type)))]
+    [(list fn args ...)        (infer-func fn args)]
+    [(list 'fn prms bdy)       (undefined)]
+    [(list 'let name val expr) (undefined)]
+
+
+
+(define (infer-type-of var expr
+                       [expected-type (make-unknown-type)]
+                       [type-bindings '()])
+  (define (equal-var? x)
+    (and (symbol? x)
+         (eq? x var)))
+
+  (define (confirm-var)
+    (let ([vartype (type-of-var var type-bindings)])
+      (if (type-compatible? vartype expected-type)
+          (append-binding (make-type-binding var expected-type)
+                          type-bindings)
+          (tc-fail-unmatched vartype expected-type))))
+
+  (define (infer-if-cond cnd)
+    (infer cnd (compile-type 'Bool) type-bindings))
+
+  (define (infer-multiple bdns . exprs)
+    (match exprs
+      ['()         bdns]
+      [(cons e es) (infer-multiple (infer expr bdns) es)]))
+
+  (define (infer expr [bdns type-bindings] [expect expected-type])
+
+    (match expr
+      [(? equal-var?)            (confirm-var)]
+      [(list 'if cnd thn els)    (undefiend)]
+      [(list fn args ...)        (undefined)]
+      [(list 'fn prms bdy)       (undefined)]
+      [(list 'let name val expr) (undefined)]
       ))
-  (cond [(type-of-var bar type-bindings) => identity]
-        [else (infer body)]))
+
+  (define new-binding (infer expr)))
+
+
 
 
 (define (undefined)
@@ -211,6 +303,7 @@
     [(cons 'U xs)    (string-join (map type->string xs) " + "
                                   #:before-first "("
                                   #:after-last ")")]
+    [(cons '? _)     "?"]
     [(cons 'F (cons a r))
      (string-append (type->string a)
                     " -> "
