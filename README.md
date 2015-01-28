@@ -24,10 +24,10 @@ the language.
 
 ## features
 
-Kinds of types (will be) supported:
+Kinds of types supported:
 
 * regular types (T): `Int, Str, Bool`
-* union types (U): `(T/U Int Str)` *(I will add special syntax for this in the future)*
+* union types (U): `(T/U Int Str)` *(I planned to improve the syntax for this in the future)*
 * function types (F): `(Str -> Str)`
 
 Currently only above will be implemented, because I failed on the
@@ -51,9 +51,11 @@ except the latter ones are built-in.
 
 ## limitations & todos
 
-nya cannot handle type check on recursive function yet. While you can
-rewrite your recursive function with help of Y-combinator to support
-it.
+nya cannot handle type check on recursive function yet. ~~While you can
+rewrite your recursive function with help of fixed point combinator to support
+it.~~ No, you cannot use Y-combinator as it requires dynamic types,
+also there is no fix-point combinator built-in in nya so far. That is
+to say, you cannot have recursive function at this point.
 
 Nonetheless, I will add support for that in the following versions.
 
@@ -61,7 +63,9 @@ Nonetheless, I will add support for that in the following versions.
 ## type detection & type check
 nya features type detection and type check. That means you can ask nya
 "what's the type of this expression" and she will give you a proper
-answer.
+answer. If you fed her with a wrongly typed exprssion and ask about
+its type, like `(+ "abc" 1)`, she will be sad tell you that she cannot
+handle it because there is a consistency in type.
 
 ## nya's syntax
 
@@ -100,6 +104,7 @@ types can be nested, for example, you can have:
      (A -> (T/U B C)))
 ```
 
+as a valid type signature.
 
 ## more?
 
