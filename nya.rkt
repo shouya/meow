@@ -4,7 +4,8 @@
 (require racket/string)
 (require racket/set)
 
-'((deftype List)
+(define whooo
+  '((deftype List)
 
   (annotate (Nil    :: List))
   (annotate (Cons   :: (T/U Int Str Bool) -> List -> List))
@@ -21,7 +22,7 @@
           0
           (+ 1 (length (cdr xs))))))
   )
-
+  )
 
 (define (compile-type type)
   (match type
@@ -29,8 +30,8 @@
     ;; right assoc prop of func type:
     ;;   A -> B -> C === A -> (B -> C)
     [(list dom '-> rng ...) (make-func-type
-                            (compile-type dom)
-                            (compile-type rng))]
+                             (compile-type dom)
+                             (compile-type rng))]
     [(list a) (compile-type a)]
     [(? regular-type-name?) (make-regular-type type)]
     ))
@@ -97,7 +98,7 @@
     ;; func expr
                                         ; TODO: check type as in typed-expr
     [(list 'fn ':: type prms bdy)
-                              (compile-type type)]
+     (compile-type type)]
 
     ;; type-annotated expr
     [(list ':: expr type)     (type-of-typed-expr expr
@@ -181,7 +182,7 @@
 (define (type-compatible? type1 type2)
   (match* (type1 type2)
     [((cons '? t1) _)                  #t]
-;    [(_ (cons '? t1))                  #f]
+                                        ;    [(_ (cons '? t1))                  #f]
     [((cons 'T name1) (cons 'T name2)) (equal? name1 name2)]
     [(_               (cons 'T name2)) #f]
     [((cons 'U ts1)   (cons 'U ts2))   (union-type-compatible? ts1 ts2)]
@@ -198,7 +199,7 @@
 
 (define (type-of-var var type-bindings)
   (cond [(assoc var type-bindings) => cdr]
-         [else                        (make-unknown-type)]))
+        [else                        (make-unknown-type)]))
 
 
 
@@ -230,9 +231,8 @@
       (tc-fail-mismatch t1 t2)))
 
 
-; Types: U T F
-; Exprs: if let fn fn-appl
-
+                                        ; Types: U T F
+                                        ; Exprs: if let fn fn-appl
 
 
 
@@ -265,20 +265,20 @@
 
 (define-syntax check-type-match
   (syntax-rules (::)
-    [(check-type-match expr :: type ...)
+    [(_ expr :: type ...)
      (check-true (type-equal? (type-of expr (pre-defined-bindings))
                               (compile-type (quote (type ...)))))]))
 
 (define-syntax check-type-match-cases
   (syntax-rules (::)
-    [(check-type-match-cases [case ...] ...)
+    [(_ [case ...] ...)
      (begin
        (check-type-match case ...) ...)]))
 
 (define-syntax check-type-compatible-cases
-  (syntax-rules (<:)
-    [(_) '()]
-    [(_ [t1 <: t2] rest ...)
+  (syntax-rules (<=: </:)
+    [(_) (void)]
+    [(_ [t1 <=: t2] rest ...)
      (begin
        (let ([ct1 (compile-type (quote t1))]
              [ct2 (compile-type (quote t2))])
@@ -292,34 +292,47 @@
        (check-type-compatible-cases rest ...))]
     ))
 
+(define-syntax check-compile-cases
+  (syntax-rules (@==>)
+    [(_ [type @==> compiled-type] ...)
+     (begin
+       (check-equal? (compile-type (quote type))
+                     (quote compiled-type))
+       ...)]
+    ))
 
 
+;; check type-compile
+(check-compile-cases
+ [(A -> B)         @==>   (F . ((T . A) . (T . B)))]
+ [((T/U A) -> B)   @==>   (F . ((T . A) . (T . B)))]
+ )
 
-(define t compile-type)
-(check-equal? (t '(A -> B))       '(F . ((T . A) . (T . B))))
-(check-equal? (t '((T/U A) -> B)) '(F . ((T . A) . (T . B))))
 
-(check-true
- (or (equal? (type->string (t '((T/U A B) -> B)))
-             "(B + A) -> B")
-     (equal? (type->string (t '((T/U A B) -> B)))
-             "(A + B) -> B")))
+;; check type->string
+(check-true (let* ([ctype    (compile-type '((T/U A B) -> B))]
+                   [type-str (type->string ctype)])
+              (or (equal? type-str "(B + A) -> B")
+                  (equal? type-str "(A + B) -> B"))))
 
+
+; a <=: b means a is compatible   with b
+; a </: b means a is incompatible with b
 
 (check-type-compatible-cases
- [A                <:   A]
+ [A                <=:  A]
  [A                </:  B]
- [A                <:   (T/U A B)]
+ [A                <=:  (T/U A B)]
  [A                </:  (T/U B C)]
- [(T/U A)          <:   A]
+ [(T/U A)          <=:  A]
  [(T/U A B)        </:  A]
- [(T/U A B)        <:   (T/U E A B C D)]
+ [(T/U A B)        <=:  (T/U E A B C D)]
  [(T/U E A B C D)  </:  (T/U A B)]
- [(A -> B)         <:   (A -> B)]
+ [(A -> B)         <=:  (A -> B)]
  [(B -> A)         </:  (A -> B)]
- [(A -> B)         <:   ((T/U A B) -> B)]
+ [(A -> B)         <=:  ((T/U A B) -> B)]
  [((T/U A B) -> B) </:  (A -> B)]
- [(A -> (T/U A B)) <:   (A -> B)]
+ [(A -> (T/U A B)) <=:  (A -> B)]
  [(A -> B)         </:  (A -> (T/U A B))]
  )
 
