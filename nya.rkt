@@ -311,3 +311,37 @@
 (check-false (type-compatible? (t '((T/U A B) -> B)) (t '(A -> B))))
 (check-true  (type-compatible? (t '(A -> (T/U A B))) (t '(A -> B))))
 (check-false (type-compatible? (t '(A -> B)) (t '(A -> (T/U A B)))))
+
+(check-type-match-cases
+ ;; literal
+ [1     :: Int]
+ ["str" :: Str]
+ [#t    :: Bool]
+ [#f    :: Bool]
+ ;; func and func appl
+ ['+       :: Int -> Int -> Int]
+ ['(+ 1)   :: Int -> Int]
+ ['(+ 1 2) :: Int]
+
+ ;; if
+ ['(if #t 1 2)                :: Int]
+ ['(if #f 1 "s")              :: T/U Int Str]
+ ['(if #t #t (if #t 1 "str")) :: T/U Str Int Bool]
+
+ ;; let
+ ['(let a 1 a)            :: Int]
+ ['(let a #t (if a 1 1))  :: Int]
+ ['(let a 1  (if #t a 1)) :: Int]
+
+ ;; fn (inference not available so far)
+ ['(fn :: (Int -> Int) [a] 1)  :: Int -> Int]
+ ;; this case should fail after finished function type check
+ ['(fn :: (Int -> Int) [a] #t) :: Int -> Int]
+
+ ;; typed-expr
+ ['(:: 1 Str)  :: Str]
+ ['(let a (:: 1 (Int -> Int)) (a 1)) :: Int]
+
+ ;; bracketed expr
+ ['($ + 1 2) :: Int]
+ )
