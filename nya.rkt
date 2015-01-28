@@ -355,19 +355,19 @@
 ;; a </: b means a is incompatible with b
 
 (check-type-compatible-cases
- [A                <=:  A]
- [A                </:  B]
- [A                <=:  (A + B)]
- [A                </:  (B + C)]
- [(A + B)        </:  A]
- [(A + B)        <=:  (E + A + B + C + D)]
- [(E + A + B + C + D)  </:  (A + B)]
- [(A -> B)         <=:  (A -> B)]
- [(B -> A)         </:  (A -> B)]
- [(A -> B)         <=:  ((A + B) -> B)]
- [((A + B) -> B) </:  (A -> B)]
- [(A -> (A + B)) <=:  (A -> B)]
- [(A -> B)         </:  (A -> (A + B))]
+ [A                   <=:  A]
+ [A                   </:  B]
+ [A                   <=:  (A + B)]
+ [A                   </:  (B + C)]
+ [(A + B)             </:  A]
+ [(A + B)             <=:  (E + A + B + C + D)]
+ [(E + A + B + C + D) </:  (A + B)]
+ [(A -> B)            <=:  (A -> B)]
+ [(B -> A)            </:  (A -> B)]
+ [(A -> B)            <=:  ((A + B) -> B)]
+ [((A + B) -> B)      </:  (A -> B)]
+ [(A -> (A + B))      <=:  (A -> B)]
+ [(A -> B)            </:  (A -> (A + B))]
  )
 
 
