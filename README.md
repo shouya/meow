@@ -27,7 +27,7 @@ the language.
 Kinds of types supported:
 
 * regular types (T): `Int, Str, Bool`
-* union types (U): `(T/U Int Str)` *(I planned to improve the syntax for this in the future)*
+* union types (U): `(Int + Str)`
 * function types (F): `(Str -> Str)`
 
 Currently only above will be implemented, because I failed on the
@@ -92,7 +92,7 @@ handle it because there is a consistency in type.
 
 * `Int,Bool,Str`: built-in types (actually the same as regualr types)
 * `A`: a name started with uppercased letter is a regular type
-* `(T/U A B C)`: union of types `A`, `B`, and `C`.
+* `(A + B + C)`: union of types `A`, `B`, and `C`.
 * `A -> B -> C`: function type, means that it takes values in type `A` and `B`, and return something in type `C`
 * `(A)`: the same as `A`
 * `A -> (B -> C)`: equivalent to `A -> B -> C`.
@@ -100,11 +100,15 @@ handle it because there is a consistency in type.
 types can be nested, for example, you can have:
 
 ```
-(T/U (A -> B)
-     (A -> (T/U B C)))
+((A -> B) +
+ (A -> (B + C)))
 ```
 
 as a valid type signature.
+
+## references
+
+no. all ideas and codes are totally original.
 
 ## more?
 

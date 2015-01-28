@@ -4,14 +4,12 @@
 (require racket/string)
 (require racket/set)
 
-(require (for-syntax syntax/parse))
-
 (define (my-program)
   (compile-type-bindings
    '((deftype List)
 
      (annotate Nil    :: List)
-     (annotate Cons   :: (T/U Int Str Bool) -> List -> List)
+     (annotate Cons   :: (Int + Str + Bool) -> List -> List)
      (annotate empty? :: List -> Bool)
      (annotate cdr    :: List -> List)
      (annotate +      :: Int -> Int -> Int)
@@ -36,7 +34,9 @@
 
 (define (compile-type type)
   (match type
-    [(list 'T/U ts ...)     (make-union-type (map compile-type ts))]
+    [(list t '+ ts ...)     (make-union-type
+			      (list (compile-type t)
+				    (compile-type ts)))]
     ;; right assoc prop of func type:
     ;;   A -> B -> C === A -> (B -> C)
     [(list dom '-> rng ...) (make-func-type
@@ -341,12 +341,11 @@
 ;; check type-compile
 (check-compile-cases
  [(A -> B)         @==>   (F . ((T . A) . (T . B)))]
- [((T/U A) -> B)   @==>   (F . ((T . A) . (T . B)))]
  )
 
 
 ;; check type->string
-(check-true (let* ([ctype    (compile-type '((T/U A B) -> B))]
+(check-true (let* ([ctype    (compile-type '((A + B) -> B))]
                    [type-str (type->string ctype)])
               (or (equal? type-str "(B + A) -> B")
                   (equal? type-str "(A + B) -> B"))))
@@ -358,18 +357,17 @@
 (check-type-compatible-cases
  [A                <=:  A]
  [A                </:  B]
- [A                <=:  (T/U A B)]
- [A                </:  (T/U B C)]
- [(T/U A)          <=:  A]
- [(T/U A B)        </:  A]
- [(T/U A B)        <=:  (T/U E A B C D)]
- [(T/U E A B C D)  </:  (T/U A B)]
+ [A                <=:  (A + B)]
+ [A                </:  (B + C)]
+ [(A + B)        </:  A]
+ [(A + B)        <=:  (E + A + B + C + D)]
+ [(E + A + B + C + D)  </:  (A + B)]
  [(A -> B)         <=:  (A -> B)]
  [(B -> A)         </:  (A -> B)]
- [(A -> B)         <=:  ((T/U A B) -> B)]
- [((T/U A B) -> B) </:  (A -> B)]
- [(A -> (T/U A B)) <=:  (A -> B)]
- [(A -> B)         </:  (A -> (T/U A B))]
+ [(A -> B)         <=:  ((A + B) -> B)]
+ [((A + B) -> B) </:  (A -> B)]
+ [(A -> (A + B)) <=:  (A -> B)]
+ [(A -> B)         </:  (A -> (A + B))]
  )
 
 
@@ -386,8 +384,8 @@
 
  ;; if
  ['(if #t 1 2)                :: Int]
- ['(if #f 1 "s")              :: T/U Int Str]
- ['(if #t #t (if #t 1 "str")) :: T/U Str Int Bool]
+ ['(if #f 1 "s")              :: Int + Str]
+ ['(if #t #t (if #t 1 "str")) :: Str + Int + Bool]
 
  ;; let
  ['(let a 1 a)            :: Int]
