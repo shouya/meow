@@ -277,11 +277,20 @@
 
 (define-syntax check-type-compatible-cases
   (syntax-rules (<:)
-    [(check-type-compatible-cases [t1 <: t2] ...)
+    [(_) '()]
+    [(_ [t1 <: t2] rest ...)
      (begin
-       (check-true (type-compatible? (compile-type (quote t1))
-                                     (compile-type (quote t2))))
-       ...)]))
+       (let ([ct1 (compile-type (quote t1))]
+             [ct2 (compile-type (quote t2))])
+         (check-true (type-compatible? ct1 ct2)))
+       (check-type-compatible-cases rest ...))]
+    [(_ [t1 </: t2] rest ...)
+     (begin
+       (let ([ct1 (compile-type (quote t1))]
+             [ct2 (compile-type (quote t2))])
+         (check-false (type-compatible? ct1 ct2)))
+       (check-type-compatible-cases rest ...))]
+    ))
 
 
 
@@ -297,20 +306,23 @@
              "(A + B) -> B")))
 
 
-(check-true  (type-compatible? (t 'A) (t 'A)))
-(check-false (type-compatible? (t 'A) (t 'B)))
-(check-true  (type-compatible? (t 'A) (t '(T/U A B))))
-(check-false (type-compatible? (t 'A) (t '(T/U B C))))
-(check-false (type-compatible? (t '(T/U A B)) (t 'A)))
-(check-true  (type-compatible? (t '(T/U A))   (t 'A)))
-(check-true  (type-compatible? (t '(T/U A B)) (t '(T/U E A B C D))))
-(check-false (type-compatible? (t '(T/U E A B C D)) (t '(T/U A B))))
-(check-true  (type-compatible? (t '(A -> B))  (t '(A -> B))))
-(check-false (type-compatible? (t '(B -> A))  (t '(A -> B))))
-(check-true  (type-compatible? (t '(A -> B)) (t '((T/U A B) -> B))))
-(check-false (type-compatible? (t '((T/U A B) -> B)) (t '(A -> B))))
-(check-true  (type-compatible? (t '(A -> (T/U A B))) (t '(A -> B))))
-(check-false (type-compatible? (t '(A -> B)) (t '(A -> (T/U A B)))))
+(check-type-compatible-cases
+ [A                <:   A]
+ [A                </:  B]
+ [A                <:   (T/U A B)]
+ [A                </:  (T/U B C)]
+ [(T/U A)          <:   A]
+ [(T/U A B)        </:  A]
+ [(T/U A B)        <:   (T/U E A B C D)]
+ [(T/U E A B C D)  </:  (T/U A B)]
+ [(A -> B)         <:   (A -> B)]
+ [(B -> A)         </:  (A -> B)]
+ [(A -> B)         <:   ((T/U A B) -> B)]
+ [((T/U A B) -> B) </:  (A -> B)]
+ [(A -> (T/U A B)) <:   (A -> B)]
+ [(A -> B)         </:  (A -> (T/U A B))]
+ )
+
 
 (check-type-match-cases
  ;; literal
