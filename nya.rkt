@@ -17,19 +17,14 @@
      ;; function like `if` in the compiler layer
      ;  (annotate (if     :: Bool -> a -> a -> a))
 
-     (def length (fn :: (Int -> Int) [x] (+ x 1)))
+     (def length
+       (fn :: (List -> Int) [xs]
+           (if (empty? xs)
+               0
+               (+ 1 (length (cdr xs))))))
 
      )))
 
-(void '(def length
-        (fn :: (List -> Int) [xs]
-            (if (empty? xs)
-                0
-                (+ 1 (length (cdr xs)))))
-
-        ;; type check for recursive functions are not supported yet.
-        ;; I'd to work on this later.
-        ))
 
 
 (define (compile-type type)
@@ -61,7 +56,8 @@
       (cons 'U result)))
 
 (define (regular-type-name? name)
-  (regexp-match #rx"^[A-Z][a-z_]*$" (symbol->string name)))
+  (and (symbol? name)
+       (regexp-match #rx"^[A-Z][A-Za-z_]*$" (symbol->string name))))
 
 (define (make-regular-type type)
   (cons 'T type))
@@ -70,10 +66,12 @@
   (cons 'F (cons dom rng)))
 
 (define (regular-type? type)
-  (eq? 'T (car type)))
+  (and (pair? type)
+       (eq? 'T (car type))))
 
 (define (func-type? type)
-  (eq? 'F (car type)))
+  (and (pair? type)
+       (eq? 'F (car type))))
 
 (define (func-type-domain type)
   (when (not (func-type? type))
@@ -84,6 +82,13 @@
     (error "try to acquire range from a non-function"))
   (cddr type))
 
+
+(define (custom-typed-expr? expr)
+
+  (match expr
+    [(list ':: _ type)         (cons expr type)]
+    [(list 'fn ':: type _ ...) (cons expr type)]
+    [_                         #f]))
 
 (define (type-of expr type-bindings)
   (match expr
@@ -97,10 +102,16 @@
     [(list 'if cnd thn els)   (type-of-if cnd thn els type-bindings)]
 
     ;; local binding expr
+    ;; specialized let for recursion support
+    [(list 'let var (app custom-typed-expr? (cons val type)) expr)
+     (let* ([var-type  (compile-type type)]
+            [var-bdn   (make-type-binding var var-type)]
+            [new-bdns  (append-binding var-bdn type-bindings)])
+       (type-of-let var val expr new-bdns))]
+    ;; let with normal values
     [(list 'let var val expr) (type-of-let var val expr type-bindings)]
 
     ;; func expr
-                                        ; TODO: check type as in typed-expr
     [(list 'fn ':: type prms bdy)
      (type-of-fn (compile-type type) prms bdy type-bindings)]
 
@@ -251,6 +262,12 @@
               [bnd      (make-type-binding name ctype)]
               [oth-bdns (compile-type-bindings-reverse rst)])
          (append-binding bnd oth-bdns))]
+      [(list (list 'def name (app custom-typed-expr? (cons e t))) rst ...)
+       (let* ([oth-bdns  (compile-type-bindings-reverse rst)]
+              [fn-bdn    (make-type-binding name (compile-type t))]
+              [new-bdns  (append-binding fn-bdn oth-bdns)]
+              [expr-type (type-of e new-bdns)])
+         new-bdns)]
       [(list (list 'def name expr) rst ...)
        (let* ([oth-bdns  (compile-type-bindings-reverse rst)]
               [expr-type (type-of expr oth-bdns)]
@@ -398,7 +415,7 @@
  ['(fn :: (Int -> Int -> Int) [a] (+ a)) :: Int -> Int -> Int]
  ;; recursive function not supported yet
  ;; TODO: support this!
- ; ['(let f (fn :: (Int -> Int) [a] (f a))) :: Int -> Int]
+ ['(let f (fn :: (Int -> Int) [a] (f a)) f) :: Int -> Int]
 
  ;; typed-expr
  ['(:: 1 Str)  :: Str]
