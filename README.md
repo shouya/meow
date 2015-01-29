@@ -24,6 +24,14 @@ the language.
 
 ## features
 
+
+nya features type detection and type check. That means you can ask nya
+"what's the type of this expression" and she will give you a proper
+answer. If you fed her with a wrongly typed exprssion and ask about
+its type, like `(+ "abc" 1)`, she will be sad tell you that she cannot
+handle it because there is a consistency in type.
+
+
 Kinds of types supported:
 
 * regular types (T): `Int, Str, Bool`
@@ -44,30 +52,28 @@ system, I will implement that as my next project)
 
 As one of my fav features, functions *always* curry. So the expression `(+ 1)` has the type `Int -> Int`, given that `(+ :: Int -> Int -> Int)`.
 
+Recursive function now supported! You may let/def recursive functions
+and check their types just as what you expected.
 
 <sup>[1]</sup>: custom types are quite the same as regular types,
 except the latter ones are built-in.
 
-
-## limitations & todos
-
-nya cannot handle type check on recursive function yet. ~~While you can
-rewrite your recursive function with help of fixed point combinator to support
-it.~~ No, you cannot use Y-combinator as it requires dynamic types,
-also there is no fix-point combinator built-in in nya so far. That is
-to say, you cannot have recursive function at this point.
-
-Nonetheless, I will add support for that in the following versions.
-
-
-## type detection & type check
-nya features type detection and type check. That means you can ask nya
-"what's the type of this expression" and she will give you a proper
-answer. If you fed her with a wrongly typed exprssion and ask about
-its type, like `(+ "abc" 1)`, she will be sad tell you that she cannot
-handle it because there is a consistency in type.
-
 ## nya's syntax
+
+nya has neat and clean syntax. on the top level there are
+*commands*. Commands are like statements in other languages. You may
+have type definition/annotation and global variable definition
+here. Note that there is no specific command for type check because
+you don't need one. When you define global values their types will be
+automatically checked.
+
+Below the layer of commands are *expressions*, they're the same as
+expressions in other functional programming languages. Two things to
+notice are: 1. function applications always curry, `(+ 1 2)` is the
+same as `((+ 1) 2)` 2. function must has at least one arguments,
+because there is no such type like `(-> Int)`, which is supposed to be
+equivalent to a single integer variable.
+
 
 ### commands
 
@@ -108,7 +114,7 @@ as a valid type signature.
 
 ## references
 
-no. all ideas and codes are totally original.
+none. all ideas and codes come from my imagination (well, yes, imagination).
 
 ## more?
 
