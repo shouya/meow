@@ -119,3 +119,5 @@ none. all ideas and codes come from my imagination (well, yes, imagination).
 ## more?
 
 Just read the code, I left some comments in the source code!
+
+[![Hakase~nya](http://img.youtube.com/vi/Am12GlkJktc/0.jpg)](http://www.youtube.com/watch?v=Am12GlkJktc)
